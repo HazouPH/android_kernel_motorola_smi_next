@@ -2330,6 +2330,7 @@ static int __atomisp_set_lsc_table(struct atomisp_sub_device *asd,
 	old_table = isp->inputs[asd->input_curr].shading_table;
 
 // <ASUS-Ian20131018+> - Intel patch, LSC force apply
+#ifdef CONFIG_VIDEO_ATOMISP_CSS20
 	if (!user_st)  {
 		if  (!asd->update_lsc_table) {
 			return 0;
@@ -2343,6 +2344,7 @@ static int __atomisp_set_lsc_table(struct atomisp_sub_device *asd,
 			 }
 		}
 	}
+#endif
 // <ASUS-Ian20131018->
 	
 	/* user config is to disable the shading table. */
