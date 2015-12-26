@@ -19,6 +19,12 @@
 #define INTEL_SCU_IPC_OSC_CLK_CNTL		    0xC6
 #define INTEL_SCU_IPC_PMDB_ACCESS		    0xD0
 
+#define SIGNED_MOS_ATTR		0x0
+#define SIGNED_COS_ATTR		0x0A
+#define SIGNED_RECOVERY_ATTR	0x0C
+#define SIGNED_POS_ATTR		0x0E
+#define SIGNED_FACTORY_ATTR	0x12
+
 struct scu_ipc_data {
 	__u32	count;  /* No. of registers */
 	__u16	addr[5]; /* Register addresses */

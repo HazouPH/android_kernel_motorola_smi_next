@@ -62,3 +62,4 @@ obj-$(CONFIG_INTEL_CRYSTALCOVE_PWRSRC)	+= intel_crystalcove_pwrsrc.o
 obj-$(CONFIG_INTEL_BYT_EC)	+= intel_byt_ec.o
 obj-$(CONFIG_INTEL_BYT_M_BTN)	+= intel_byt_buttons.o
 obj-$(CONFIG_INTEL_CRYSTALCOVE_PAGE0)	+= intel_crystalcove_page0.o
+obj-$(CONFIG_INTEL_MID_OSIP)	+= intel_mid_osip.o
