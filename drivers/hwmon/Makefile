@@ -131,7 +131,7 @@ obj-$(CONFIG_SENSORS_HMC5883)           += hmc5883.o
 obj-$(CONFIG_SENSORS_MS5607)		+= ms5607.o
 obj-$(CONFIG_SENSORS_LTR502ALS)		+= ltr502als.o
 obj-$(CONFIG_SENSORS_MPU3050)		+= mpu3050.o
-
+obj-$(CONFIG_MSIC_GPADC)        += intel_mid_gpadc.o
 obj-$(CONFIG_PMBUS)		+= pmbus/
 
 ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
