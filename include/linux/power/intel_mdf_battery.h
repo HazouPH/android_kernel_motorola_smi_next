@@ -26,7 +26,6 @@
 #ifndef __INTEL_MDF_BATTERY_H_
 #define __INTEL_MDF_BATTERY_H_
 
-extern void  mfld_umip_read_termination_current(u32 *term_curr);
 #ifdef CONFIG_BATTERY_INTEL_MDF
 extern int intel_msic_is_current_sense_enabled(void);
 extern int intel_msic_check_battery_present(void);
