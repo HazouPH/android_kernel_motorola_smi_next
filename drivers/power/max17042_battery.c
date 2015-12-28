@@ -2030,7 +2030,7 @@ static int __devinit max17042_probe(struct i2c_client *client,
 	if (chip->chip_type == MAX17042)
 		chip->battery.name = "max17042_battery";
 	else
-		chip->battery.name = "max17047_battery";
+		chip->battery.name = "max170xx_battery";
 	chip->battery.type		= POWER_SUPPLY_TYPE_BATTERY;
 	chip->battery.get_property	= max17042_get_property;
 	chip->battery.set_property	= max17042_set_property;
@@ -2255,3 +2255,4 @@ early_param("fake_batt_full", set_fake_batt_full);
 MODULE_AUTHOR("MyungJoo Ham <myungjoo.ham@samsung.com>");
 MODULE_DESCRIPTION("MAX17042 Fuel Gauge");
 MODULE_LICENSE("GPL");
+
