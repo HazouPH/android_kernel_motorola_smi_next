@@ -328,9 +328,7 @@ static void init_tgain_toff(struct max17042_platform_data *pdata)
 
 static void init_callbacks(struct max17042_platform_data *pdata)
 {
-	if (INTEL_MID_BOARD(1, PHONE, MFLD) ||
-		INTEL_MID_BOARD(2, TABLET, MFLD, YKB, ENG) ||
-		INTEL_MID_BOARD(2, TABLET, MFLD, YKB, PRO)) {
+#ifdef CONFIG_BATTERY_INTEL_MDF
 		/* MFLD Phones and Yukka beach Tablet */
 		pdata->current_sense_enabled =
 					intel_msic_is_current_sense_enabled;
@@ -350,7 +348,8 @@ static void init_callbacks(struct max17042_platform_data *pdata)
 		pdata->is_lowbatt_shutdown_enabled =
 					intel_msic_is_lowbatt_shutdown_en;
 		pdata->get_vmin_threshold = intel_msic_get_vsys_min;
-	} else if (INTEL_MID_BOARD(2, TABLET, MFLD, RR, ENG) ||
+#endif
+	if (INTEL_MID_BOARD(2, TABLET, MFLD, RR, ENG) ||
 			INTEL_MID_BOARD(2, TABLET, MFLD, RR, PRO) ||
 			INTEL_MID_BOARD(2, TABLET, MFLD, SLP, ENG) ||
 			INTEL_MID_BOARD(2, TABLET, MFLD, SLP, PRO)) {
@@ -390,7 +389,7 @@ static void init_callbacks(struct max17042_platform_data *pdata)
 static void init_platform_params(struct max17042_platform_data *pdata)
 {
 	pdata->fg_algo_model = 100;
-	if (INTEL_MID_BOARD(1, PHONE, MFLD)) {
+#ifdef CONFIG_BATTERY_INTEL_MDF
 		/* MFLD phones */
 		if (!(INTEL_MID_BOARD(2, PHONE, MFLD, LEX, ENG)) ||
 			!(INTEL_MID_BOARD(2, PHONE, MFLD, LEX, PRO)))
@@ -403,7 +402,8 @@ static void init_platform_params(struct max17042_platform_data *pdata)
 			pdata->enable_current_sense = false;
 			pdata->technology = POWER_SUPPLY_TECHNOLOGY_UNKNOWN;
 		}
-	} else if (INTEL_MID_BOARD(2, TABLET, MFLD, YKB, ENG) ||
+#endif
+	if (INTEL_MID_BOARD(2, TABLET, MFLD, YKB, ENG) ||
 		INTEL_MID_BOARD(2, TABLET, MFLD, YKB, PRO)) {
 		/* Yukka beach Tablet */
 		if (msic_battery_check(pdata)) {

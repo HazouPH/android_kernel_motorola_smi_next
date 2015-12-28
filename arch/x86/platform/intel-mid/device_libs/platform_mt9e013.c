@@ -97,12 +97,11 @@ static int mt9e013_csi_configure(struct v4l2_subdev *sd, int flag)
 
 static bool mt9e013_low_fps(void)
 {
-	if (INTEL_MID_BOARD(1, PHONE, MFLD) &&
-	    (SPID_PRODUCT_ID(INTEL, MFLD, PHONE, LEX, PRO) ||
-	     SPID_PRODUCT_ID(INTEL, MFLD, PHONE, LEX, ENG)))
+#ifdef CONFIG_BATTERY_INTEL_MDF
 		return true;
-	else
+#else
 		return false;
+#endif
 }
 
 static struct camera_sensor_platform_data mt9e013_sensor_platform_data = {
