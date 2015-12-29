@@ -21,6 +21,7 @@
 #include <linux/gpio_keys.h>
 #include <linux/platform_device.h>
 #include <linux/i2c-gpio.h>
+#include <linux/input/touch_platform.h>
 
 #include <asm/intel-mid.h>
 
@@ -116,6 +117,9 @@
 /* WIFI devices */
 #include "device_libs/platform_wl12xx.h"
 #include "device_libs/platform_wifi.h"
+
+/* MXT 224S */
+#include "device_libs/platform_mxt224S.h"
 
 
 static void __init *no_platform_data(void *info)
@@ -241,6 +245,8 @@ struct devs_id __initconst device_ids[] = {
 *///					&intel_register_i2c_camera_device},
 	{"audience_es305", SFI_DEV_TYPE_I2C, 0, &audience_platform_data,
 						NULL},
+	{ATMXT_I2C_NAME, SFI_DEV_TYPE_I2C, 0, &mot_setup_touch_atmxt,
+		NULL},
 /*	{"cs42l73", SFI_DEV_TYPE_I2C, 1, &cs42l73_platform_data, NULL},
 	{"mxt224", SFI_DEV_TYPE_I2C, 0, &mxt224_platform_data, NULL},
 	{"synaptics_3202", SFI_DEV_TYPE_I2C, 0, &rmi4_platform_data},

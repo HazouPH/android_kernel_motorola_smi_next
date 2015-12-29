@@ -57,6 +57,7 @@ obj-$(subst m,y,$(CONFIG_BYT_ULPMC_BATTERY))				+= platform_ulpmc_battery.o
 obj-$(subst m,y,$(CONFIG_BYT_FFRD8_CHARGER))				+= platform_byt_ffrd8_charger.o
 obj-$(subst m,y,$(CONFIG_EXTCON_FSA9285))				+= platform_fsa9285.o
 obj-$(subst m,y,$(CONFIG_TOUCHSCREEN_ATMEL_MXT224))			+= platform_mxt224.o
+obj-$(subst m,y,$(CONFIG_TOUCHSCREEN_ATMEL_MXT224S))			+= platform_mxt224S.o
 obj-$(subst m,y,$(CONFIG_A1026))					+= platform_a1026.o
 obj-$(subst m,y,$(CONFIG_SENSORS_APDS990X))				+= platform_apds990x.o
 obj-$(subst m,y,$(CONFIG_CHARGER_BQ24192))				+= platform_bq24192.o
