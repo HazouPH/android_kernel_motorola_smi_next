@@ -133,6 +133,7 @@ obj-$(CONFIG_SENSORS_LTR502ALS)		+= ltr502als.o
 obj-$(CONFIG_SENSORS_MPU3050)		+= mpu3050.o
 obj-$(CONFIG_MSIC_GPADC)        += intel_mid_gpadc.o
 obj-$(CONFIG_PMBUS)		+= pmbus/
+obj-$(CONFIG_MID_PWM)			+= intel_mid_pwm.o
 
 ccflags-$(CONFIG_HWMON_DEBUG_CHIP) := -DDEBUG
 
