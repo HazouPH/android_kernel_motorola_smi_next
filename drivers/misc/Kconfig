@@ -402,6 +402,22 @@ config SENSORS_AK8975
 	  If you say yes here you get support for Asahi Kasei's
 	  orientation sensor AK8975.
 
+config SENSORS_AK8963
+       tristate "AK8963 compass support"
+       default n
+       depends on I2C
+       help
+         If you say yes here you get support for Asahi Kasei's
+         orientation sensor AK8963.
+
+config SENSORS_LIS3DH
+        tristate "LIS3DH Accelerometer"
+        default n
+        depends on I2C
+        help
+         Say yes here if you wish to include the ST Micro
+         LIS3DH accelerometer driver.
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
@@ -552,6 +568,16 @@ config VLV2_PLAT_CLK
 	tristate "Vlv2 platform clock control driver"
 	---help---
 	 Driver to enable the platform clock control for valleyview2
+
+config A1026
+	tristate "Audience a1026/eS305 Voice Processor"
+	depends on I2C && INTEL_SCU_IPC
+	help
+	  Provides an interface to the Audience voice processing
+	  unit via an I2C bus interface.
+
+	  To compile this driver as a module, choose M here: the module will
+	  be called a1026.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

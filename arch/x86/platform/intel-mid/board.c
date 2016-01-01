@@ -121,6 +121,9 @@
 /* MXT 224S */
 #include "device_libs/platform_mxt224S.h"
 
+/* Sensor devices */
+#include "device_libs/platform_mmi-sensors.h"
+
 
 static void __init *no_platform_data(void *info)
 {
@@ -325,6 +328,14 @@ struct devs_id __initconst device_ids[] = {
 		&panel_handler},
 	{},
 };
+
+static int __init mmi_platform_init(void)
+{
+	mmi_register_board_i2c_devs();
+	mmi_sensors_init();
+	return 0;
+}
+device_initcall(mmi_platform_init);
 
 /*
  * Identifies the type of the board using SPID and returns

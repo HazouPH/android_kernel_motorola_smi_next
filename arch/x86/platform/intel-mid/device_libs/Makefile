@@ -144,3 +144,4 @@ obj-$(subst m,y,$(CONFIG_DRM_MRFLD))					+= platform_panel.o
 
 #ASUS- Hollie 2013/08/23
 obj-$(subst m,y,$(CONFIG_BYT_BATTERY))				+= platform_byt_battery.o
+obj-$(CONFIG_BOARD_MFLD_BLACKBAY)				+= platform_mmi-sensors.o
