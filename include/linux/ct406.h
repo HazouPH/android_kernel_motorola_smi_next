@@ -32,24 +32,18 @@
 struct ct406_platform_data {
 	u16	irq;
 	u8	regulator_name[CT406_REGULATOR_NAME_LENGTH];
+
 	u8	prox_samples_for_noise_floor;
 
-	u16	ct405_prox_saturation_threshold;
-	u16	ct405_prox_covered_offset;
-	u16	ct405_prox_uncovered_offset;
-	u16	ct405_prox_recalibrate_offset;
-
-	u16	ct406_prox_saturation_threshold;
 	u16	ct406_prox_covered_offset;
 	u16	ct406_prox_uncovered_offset;
 	u16	ct406_prox_recalibrate_offset;
 	u8	ct406_prox_pulse_count;
 	u8	ct406_prox_offset;
 
-	u16	ip_prox_limit;
-	u16	ip_als_limit;
+	u8	ink_type;
 
-	u8	als_lens_transmissivity;
+	int gpio_irq;
 } __packed;
 
 #endif	/* __KERNEL__ */
