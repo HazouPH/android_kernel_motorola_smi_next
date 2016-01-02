@@ -24,7 +24,7 @@
 static struct akm8963_platform_data mp_akm8963_pdata = {
 	.layout = 1,
 	.outbit = 1,
-	.gpio_DRDY = 0,
+	.gpio_IRQ = 0,
 	.gpio_RST = 0,
 };
 
@@ -166,7 +166,7 @@ void __init mmi_sensors_init(void)
 		gpio_request(gpio, "akm8963 irq");
 		gpio_direction_input(gpio);
 		gpio_export(gpio , 0);
-		mp_akm8963_pdata.gpio_DRDY = gpio;
+		mp_akm8963_pdata.gpio_IRQ = gpio;
 	}
 
 	mp_akm8963_pdata.layout = 2;

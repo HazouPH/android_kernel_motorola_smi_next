@@ -15,26 +15,30 @@
  */
 
 /*
- * Revisions Copyright (C) 2012 Motorola Mobility, Inc.
+ * Revisions Copyright (C) 2013 Motorola Mobility, LLC.
  */
 
 /*#define DEBUG*/
 /*#define VERBOSE_DEBUG*/
 
 #include <linux/delay.h>
-#include <linux/module.h>
 #include <linux/device.h>
-#include <linux/earlysuspend.h>
 #include <linux/freezer.h>
 #include <linux/gpio.h>
 #include <linux/input.h>
 #include <linux/interrupt.h>
+#include <linux/irq.h>
 #include <linux/i2c.h>
 #include <linux/miscdevice.h>
+#include <linux/of.h>
+#include <linux/of_gpio.h>
+#include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/suspend.h>
 #include <linux/uaccess.h>
-
+#include <linux/workqueue.h>
 #include <linux/akm8963.h>
+#include <linux/regulator/consumer.h>
 
 #define AKM8963_DEBUG_IF	0
 
@@ -43,19 +47,21 @@
 #define AKM8963_DRDY_SLEEP	10
 #define AKM8963_DRDY_MAX_WAIT	11
 
+#define I2C_RETRY_DELAY    5
+
+#define I2C_RETRIES        5
+
 struct akm8963_data {
 	struct i2c_client	*i2c;
 	struct input_dev	*input;
 	struct device		*class_dev;
 	struct class		*compass;
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend	akm_early_suspend;
-#endif
+	struct work_struct	work;
 
 	wait_queue_head_t	drdy_wq;
 	wait_queue_head_t	open_wq;
 
+	struct regulator *vdd;
 	struct mutex	sensor_mutex;
 	int8_t		sense_data[SENSOR_DATA_SIZE];
 	uint32_t	drdy_flag;
@@ -68,12 +74,15 @@ struct akm8963_data {
 	uint32_t	active_flag;
 	uint32_t	busy_flag;
 	uint32_t	suspend_flag;
+	uint32_t	first_time_flag;
 
 	int64_t	delay[AKM_NUM_SENSORS];
 	char	layout;
 	char	outbit;
-	int	gpio;
+	int	irq;
 	int	rstn;
+
+	struct notifier_block pm_notifier;
 };
 
 static struct akm8963_data *s_akm;
@@ -101,8 +110,14 @@ static int akm8963_i2c_rxdata(
 	};
 	unsigned char addr = rxData[0];
 	int err;
+	int tries = 0;
 
-	err = i2c_transfer(i2c->adapter, msgs, 2);
+	do {
+		err = i2c_transfer(i2c->adapter, msgs, 2);
+		if (err < 0)
+			msleep_interruptible(I2C_RETRY_DELAY);
+	} while ((err < 0) && (++tries < I2C_RETRIES));
+
 	if (err < 0) {
 		dev_err(&i2c->dev, "%s: transfer failed.", __func__);
 		return -EIO;
@@ -127,8 +142,14 @@ static int akm8963_i2c_txdata(
 		},
 	};
 	int err;
+	int tries = 0;
 
-	err = i2c_transfer(i2c->adapter, msg, 1);
+	do {
+		err = i2c_transfer(i2c->adapter, msg, 1);
+		if (err < 0)
+			msleep_interruptible(I2C_RETRY_DELAY);
+	} while ((err < 0) && (++tries < I2C_RETRIES));
+
 	if (err < 0) {
 		dev_err(&i2c->dev, "%s: transfer failed.", __func__);
 		return -EIO;
@@ -253,6 +274,7 @@ static int AKECS_SetMode(
 	mutex_unlock(&akm->state_mutex);
 
 	udelay(100);
+
 	return err;
 }
 
@@ -268,7 +290,7 @@ static int AKECS_GetData(
 	char buffer[SENSOR_DATA_SIZE];
 	int err;
 
-	while (gpio_get_value(akm->gpio) == 0) {
+	while (gpio_get_value(akm->irq) == 0) {
 		wait_count++;
 		if (wait_count > AKM8963_DRDY_MAX_WAIT) {
 			dev_err(&akm->i2c->dev,
@@ -794,6 +816,11 @@ static ssize_t akm8963_sysfs_enable_store(
 	if (false == get_value_as_int(buf, count, &en))
 		return -EINVAL;
 
+	if (akm->first_time_flag == 0) {
+		enable_irq(akm->irq);
+		akm->first_time_flag = 1;
+	}
+
 	en = en ? 1 : 0;
 
 	mutex_lock(&akm->state_mutex);
@@ -1245,34 +1272,131 @@ static int akm8963_input_init(
 
 /***** akm functions ************************************************/
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-static void akm8963_suspend(struct early_suspend *handler)
+static void akm8963_work(struct work_struct *work)
 {
-	dev_info(&s_akm->i2c->dev, "%s: Suspend\n", __func__);
+	struct akm8963_data *akm = container_of(
+		work, struct akm8963_data, work);
+	char buffer[SENSOR_DATA_SIZE];
+	int err;
 
-	mutex_lock(&s_akm->state_mutex);
-	s_akm->suspend_flag = 1;
-	s_akm->drdy_flag = 0;
-	s_akm->busy_flag = 0;
-	s_akm->active_flag = 0;
-	mutex_unlock(&s_akm->state_mutex);
+	memset(buffer, 0, sizeof(buffer));
+	buffer[0] = AK8963_REG_ST1;
+	err = akm8963_i2c_rxdata(akm->i2c, buffer, SENSOR_DATA_SIZE);
+	if (err < 0) {
+		dev_err(&akm->i2c->dev, "%s failed.", __func__);
+		goto work_func_end;
+	}
+	/* Check ST bit */
+	if ((buffer[0] & 0x01) != 0x01) {
+		dev_err(&akm->i2c->dev, "%s ST is not set.", __func__);
+		goto work_func_end;
+	}
 
-	wake_up(&s_akm->open_wq);
+	mutex_lock(&akm->sensor_mutex);
+	memcpy(akm->sense_data, buffer, SENSOR_DATA_SIZE);
+	akm->drdy_flag = 1;
+	akm->busy_flag = 0;
+	mutex_unlock(&akm->sensor_mutex);
+
+work_func_end:
+	wake_up(&akm->drdy_wq);
+	enable_irq(akm->irq);
 }
 
-static void akm8963_resume(struct early_suspend *handler)
+static int akm8963_suspend(struct akm8963_data *akm)
 {
-	dev_info(&s_akm->i2c->dev, "%s: Resume\n", __func__);
+	dev_info(&akm->i2c->dev, "%s: Suspend\n", __func__);
 
-	mutex_lock(&s_akm->state_mutex);
-	if (s_akm->enable_flag != 0)
-		s_akm->active_flag = 1;
-	s_akm->suspend_flag = 0;
-	mutex_unlock(&s_akm->state_mutex);
+	disable_irq(akm->irq);
 
-	wake_up(&s_akm->open_wq);
+	mutex_lock(&akm->state_mutex);
+	akm->suspend_flag = 1;
+	akm->drdy_flag = 0;
+	akm->busy_flag = 0;
+	akm->active_flag = 0;
+	mutex_unlock(&akm->state_mutex);
+
+	wake_up(&akm->open_wq);
+
+	return 0;
 }
-#endif /* CONFIG_HAS_EARLYSUSPEND */
+
+static int akm8963_resume(struct akm8963_data *akm)
+{
+	dev_info(&akm->i2c->dev, "%s: Resume\n", __func__);
+
+	mutex_lock(&akm->state_mutex);
+	if (akm->enable_flag != 0)
+		akm->active_flag = 1;
+	akm->suspend_flag = 0;
+	mutex_unlock(&akm->state_mutex);
+
+	enable_irq(akm->irq);
+
+	wake_up(&akm->open_wq);
+
+	return 0;
+}
+
+static int akm8963_pm_event(struct notifier_block *this,
+	unsigned long event, void *ptr)
+{
+	struct akm8963_data *akm = container_of(this,
+		struct akm8963_data, pm_notifier);
+
+	switch (event) {
+	case PM_SUSPEND_PREPARE:
+		akm8963_suspend(akm);
+		break;
+	case PM_POST_SUSPEND:
+		akm8963_resume(akm);
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+#ifdef CONFIG_OF
+static struct akm8963_platform_data *
+akm8963_of_init(struct i2c_client *client)
+{
+	struct akm8963_platform_data *pdata;
+	struct device_node *np = client->dev.of_node;
+	u32 val;
+
+	pdata = devm_kzalloc(&client->dev, sizeof(*pdata), GFP_KERNEL);
+	if (!pdata) {
+		dev_err(&client->dev, "pdata allocation failure\n");
+		return NULL;
+	}
+
+	val = of_get_named_gpio(np, "akm,gpio-irq", 0);
+	if (!gpio_is_valid((int)val)) {
+		dev_info(&client->dev, "akm8963 irq gpio invalid\n");
+		return NULL;
+	}
+	pdata->gpio_IRQ = gpio_to_irq((int)val);
+
+	pdata->gpio_RST = of_get_named_gpio(np, "akm,gpio-rst", 0);
+	if (!gpio_is_valid(pdata->gpio_RST)) {
+		dev_info(&client->dev, "akm8963 rst gpio invalid\n");
+		pdata->gpio_RST = 0;
+	}
+
+
+	if(!of_property_read_u32(np, "akm,layout", &val))
+		pdata->layout = (u8)val;
+	if(!of_property_read_u32(np, "akm,outbit", &val))
+		pdata->outbit = (u8)val;
+	return pdata;
+}
+#else
+static inline struct akm8963_platform_data *
+akm8963_of_init(struct i2c_client *client)
+{
+	return NULL;
+}
+#endif
 
 int akm8963_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -1299,25 +1423,51 @@ int akm8963_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	}
 
 	/***** Set layout information *****/
-	pdata = client->dev.platform_data;
+	if (client->dev.of_node)
+		pdata = akm8963_of_init(client);
+	else
+		pdata = client->dev.platform_data;
+
 	if (pdata) {
 		/* Platform data is available. copy its value to local. */
 		s_akm->layout = pdata->layout;
 		s_akm->outbit = pdata->outbit;
 		s_akm->rstn = pdata->gpio_RST;
-		s_akm->gpio = pdata->gpio_DRDY;
+		s_akm->irq = pdata->gpio_IRQ;
 	} else {
 		/* Platform data is not available. */
 		dev_err(&client->dev, "%s: No platform data.", __func__);
 		goto exit_device_fail;
 	}
 
+	s_akm->vdd = regulator_get(&client->dev, "vdd");
+	if (IS_ERR(s_akm->vdd)) {
+		dev_info(&client->dev, "vdd regulator control absent\n");
+		s_akm->vdd = NULL;
+	}
+
+	if (s_akm->vdd != NULL) {
+		err = regulator_enable(s_akm->vdd);
+		usleep_range(400, 400);
+		if (err)
+			dev_info(&client->dev, "regulator enable fail\n");
+	}
+
+	/** Reset the device with 10us low pulse **/
+	if (s_akm->rstn != 0) {
+		gpio_set_value(s_akm->rstn, 0);
+		udelay(10);
+		gpio_set_value(s_akm->rstn, 1);
+	}
+	/** Wait for at least 100us before starting I2C talking **/
+	usleep_range(100, 100);
+
 	/***** I2C initialization *****/
 	s_akm->i2c = client;
 	/* check connection */
 	err = akm8963_i2c_check_device(client);
 	if (err < 0)
-		goto exit_device_fail;
+		goto exit_init_fail;
 	/* set client data */
 	i2c_set_clientdata(client, s_akm);
 
@@ -1345,9 +1495,12 @@ int akm8963_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	s_akm->busy_flag = 0;
 	s_akm->suspend_flag = 0;
 	s_akm->enable_flag = 0;
+	s_akm->first_time_flag = 0;
 
 	for (i = 0; i < AKM_NUM_SENSORS; i++)
 		s_akm->delay[i] = -1;
+
+	INIT_WORK(&s_akm->work, akm8963_work);
 
 	/***** misc *****/
 	err = misc_register(&akm8963_dev);
@@ -1365,20 +1518,29 @@ int akm8963_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		goto exit_sfs_fail;
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	s_akm->akm_early_suspend.suspend = akm8963_suspend;
-	s_akm->akm_early_suspend.resume = akm8963_resume;
-	register_early_suspend(&s_akm->akm_early_suspend);
-#endif
+	s_akm->pm_notifier.notifier_call = akm8963_pm_event;
+	err = register_pm_notifier(&s_akm->pm_notifier);
+	if (err < 0) {
+		pr_err("%s:Register_pm_notifier failed: %d\n", __func__, err);
+		goto exit_pm_fail;
+	}
 
 	dev_info(&client->dev, "%s: success", __func__);
 	return 0;
 
+exit_pm_fail:
+	remove_sysfs_interfaces(s_akm);
 exit_sfs_fail:
 	misc_deregister(&akm8963_dev);
 exit_register_fail:
+	if (s_akm->irq)
+		free_irq(s_akm->irq, s_akm);
 	input_unregister_device(s_akm->input);
 exit_init_fail:
+	if (s_akm->vdd != NULL) {
+		regulator_disable(s_akm->vdd);
+		regulator_put(s_akm->vdd);
+	}
 exit_device_fail:
 	kfree(s_akm);
 exit_kzalloc_fail:
@@ -1390,15 +1552,31 @@ static int akm8963_remove(struct i2c_client *client)
 {
 	struct akm8963_data *akm = i2c_get_clientdata(client);
 
-	unregister_early_suspend(&akm->akm_early_suspend);
+	if (akm->vdd != NULL) {
+		regulator_disable(akm->vdd);
+		regulator_put(akm->vdd);
+	}
+
+	unregister_pm_notifier(&akm->pm_notifier);
 	remove_sysfs_interfaces(akm);
 	if (misc_deregister(&akm8963_dev) < 0)
 		dev_err(&client->dev, "%s: misc deregister failed.", __func__);
+	if (akm->irq)
+		free_irq(akm->irq, akm);
 	input_unregister_device(akm->input);
 	kfree(akm);
 	dev_info(&client->dev, "%s: successfully removed.", __func__);
 	return 0;
 }
+
+#ifdef CONFIG_OF
+static struct of_device_id akm8963_match_tbl[] = {
+	{ .compatible = "akm,akm8963" },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, akm8963_match_tbl);
+#endif
+
 
 static const struct i2c_device_id akm8963_id[] = {
 	{AKM8963_I2C_NAME, 0 },
@@ -1411,6 +1589,7 @@ static struct i2c_driver akm8963_driver = {
 	.id_table	= akm8963_id,
 	.driver = {
 		.name	= AKM8963_I2C_NAME,
+		.of_match_table = of_match_ptr(akm8963_match_tbl),
 	},
 };
 
