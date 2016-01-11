@@ -26,7 +26,7 @@
 
 #define INTEL_MID_RAM_CONSOLE_SIZE_DEFAULT	SZ_2M
 
-#ifdef CONFIG_X86_32
+#if defined (CONFIG_X86_32) && ! defined (CONFIG_BOARD_MFLD_BLACKBAY)
 #define INTEL_PERSISTENT_RAM_MAX_MEM  (max_low_pfn << PAGE_SHIFT)
 #else
 #define INTEL_PERSISTENT_RAM_MAX_MEM  (1 << 28)
