@@ -963,6 +963,11 @@ static int __init sfi_parse_oemb(struct sfi_table_header *table)
 
 	memcpy(&spid, &oemb->spid, sizeof(struct soft_platform_id));
 
+#ifdef CONFIG_BOARD_MFLD_BLACKBAY
+        /* Motorola Razr I (blackbay variant) spid value */
+        spid.platform_family_id = 0x0; // INTEL_MFLD_PHONE
+#endif
+
 	if (oemb->header.len <
 			(char *)oemb->ssn + INTEL_MID_SSN_SIZE - (char *)oemb) {
 		pr_err("SFI OEMB does not contains SSN\n");
