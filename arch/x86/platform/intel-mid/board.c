@@ -338,6 +338,31 @@ static int __init mmi_platform_init(void)
 device_initcall(mmi_platform_init);
 
 /*
+ * Temporary work around for items missing from SFI tables.
+ */
+
+struct sfi_device_table_entry xmm6260_pentry = {
+	.name		=	"XMM_6260",
+};
+
+static int __init modem_sfi_workaround(void)
+{
+	struct devs_id *dev = NULL;
+
+	/*
+	 * Add XMM_6260 for detection;
+	 */
+	dev = get_device_id(SFI_DEV_TYPE_MDM, "XMM_6260");
+	if (dev != NULL)
+		sfi_handle_mdm(&xmm6260_pentry, dev);
+	else
+		pr_err("Dev id is NULL for %s\n", "XMM_6260");
+
+	return 0;
+}
+device_initcall(modem_sfi_workaround);
+
+/*
  * Identifies the type of the board using SPID and returns
  * the respective device_id ptr.
  * @ returns NULL for invalid device.
